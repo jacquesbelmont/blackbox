@@ -2,7 +2,7 @@
 """
 Feith Data Migration Script - Production Ready
 Blackbox Sentinel - Module 3: Data Intelligence
-
+ 
 Purpose: Migrate legacy Feith document management data to modern systems
          using LLM-powered transformation for unstructured data
 
@@ -11,7 +11,7 @@ Date: January 31, 2026
 """
 
 import os
-import json
+import json # for parsing LLM responses
 import asyncio
 import logging
 from datetime import datetime
