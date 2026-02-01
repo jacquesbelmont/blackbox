@@ -3,7 +3,7 @@
 import asyncio
 
 from feith_migrator import MigrationPipeline, Config, TransformedRecord
-
+ 
 
 async def wednesday_demo():
     print("\n" + "=" * 70)

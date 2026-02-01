@@ -6,7 +6,7 @@ Blackbox Sentinel - Module 3: Data Intelligence
 Purpose: Migrate legacy Feith document management data to modern systems
          using LLM-powered transformation for unstructured data
 
-Author: Jacques - AI Security Engineer
+Author: Jacques - AI Engineer
 Date: January 31, 2026
 """
 

@@ -7,7 +7,7 @@
 1. **DGX Access:**
    ```bash
    ssh brandon@dgx-server.internal
-   ```
+   ``` 
 
 2. **Python Environment:**
    ```bash

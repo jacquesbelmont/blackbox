@@ -2,7 +2,7 @@
 
 This folder contains the Feith migration proof-of-concept script and demo runners.
 
-## Files
+## Files 
 
 - `feith_migrator.py`: Migration pipeline (extract -> LLM transform -> stage to target DB)
 - `feith_migrator.env.example`: environment template
