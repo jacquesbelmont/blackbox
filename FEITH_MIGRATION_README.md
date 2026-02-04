@@ -22,6 +22,80 @@
 
 ---
 
+## Local Simulation (Realistic) - SQL Server / Azure SQL Edge
+
+If you do not have access to the real Feith database yet, you can simulate a Feith-like source database locally using SQL Server.
+
+### Recommended on macOS (Apple Silicon): Azure SQL Edge (Docker)
+
+Prerequisites (local machine):
+- Install Python deps: `pip install -r requirements.txt` (includes `pyodbc`)
+- Install Microsoft ODBC driver (recommended: ODBC Driver 18 for SQL Server)
+  - Easiest path is to use Azure Data Studio (which can also manage the DB)
+  - Or install ODBC via Homebrew/Microsoft repo (varies by macOS version)
+
+1. Start the container:
+
+```bash
+docker run -d --name feith-sql \
+  -e 'ACCEPT_EULA=1' \
+  -e 'MSSQL_SA_PASSWORD=YourStrong!Passw0rd' \
+  -p 1433:1433 \
+  mcr.microsoft.com/azure-sql-edge
+```
+
+2. Set `.env` to use SQL Server as Feith source:
+
+```bash
+# Use SQL Server as the Feith source DB
+FEITH_FORCE_SQLITE=false
+FEITH_DB_URL=mssql+pyodbc://sa:YourStrong!Passw0rd@localhost:1433/feith?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+
+# Keep staging local (SQLite) for simple demos
+TARGET_DB_URL=sqlite:///migration_staging.db
+
+# LLM can be Ollama locally (no DGX required)
+LLM_API_URL=http://localhost:11434/api/generate
+LLM_MODEL=llama3
+```
+
+### Importing Feith-like sample records
+
+Before importing, ensure the database `feith` exists (the loader will create the table, but not the database).
+You can create it using Azure Data Studio or by running a SQL query against the server:
+
+```sql
+CREATE DATABASE feith;
+```
+
+Create a CSV/JSON/JSONL file with (at minimum):
+- `doc_id`
+- `doc_type`
+- `create_date`
+- `metadata_xml`
+- `ocr_text`
+- `file_path`
+- `migration_status` (optional, defaults to `PENDING`)
+
+Then load into the simulated Feith DB:
+
+```bash
+python3 load_feith_samples.py --input ./feith_samples.csv --db-url "$FEITH_DB_URL"
+```
+
+Notes:
+- CSV header aliases are supported (e.g., `feith_id` -> `doc_id`, `type` -> `doc_type`, `ocr` -> `ocr_text`).
+- Use `--mode skip` to ignore records that already exist.
+
+### Run the same migration pipeline
+
+```bash
+python3 validate_single.py DOC-00001
+python3 wednesday_demo.py
+```
+
+---
+
 ## Installation (5 minutes)
 
 ```bash

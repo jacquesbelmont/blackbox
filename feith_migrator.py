@@ -20,7 +20,7 @@ from dataclasses import dataclass, asdict
 import re
 
 # Database & ORM
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Boolean, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Boolean, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
@@ -33,7 +33,7 @@ import httpx
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Configure logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -55,6 +55,7 @@ class Config:
     """Migration configuration"""
     
     # Feith Database (Source)
+    FEITH_DB_URL = os.getenv("FEITH_DB_URL", "").strip() or None
     FEITH_DB_HOST = os.getenv("FEITH_DB_HOST", "feith-db.internal")
     FEITH_DB_PORT = os.getenv("FEITH_DB_PORT", "1521")
     FEITH_DB_NAME = os.getenv("FEITH_DB_NAME", "FEITH_PROD")
@@ -62,6 +63,7 @@ class Config:
     FEITH_DB_PASSWORD = os.getenv("FEITH_DB_PASSWORD", "")
     FEITH_DB_SCHEMA = os.getenv("FEITH_DB_SCHEMA", "") or None
     FEITH_WRITEBACK_ENABLED = os.getenv("FEITH_WRITEBACK_ENABLED", "false").lower() in {"1", "true", "yes"}
+    FEITH_FORCE_SQLITE = os.getenv("FEITH_FORCE_SQLITE", "false").lower() in {"1", "true", "yes"}
     
     # Target Database (Destination)
     TARGET_DB_URL = os.getenv("TARGET_DB_URL", "postgresql://user:pass@localhost/target_db")
@@ -166,17 +168,82 @@ class LLMClient:
         self.client = httpx.AsyncClient(timeout=timeout_seconds)
     
     async def generate(self, prompt: str, max_tokens: int = 1024, temperature: float = 0.1) -> str:
-        """Generate completion from LLM"""
+        """Generate completion from LLM.
+
+        Supported APIs:
+        - vLLM / OpenAI Completions: POST /v1/completions
+        - OpenAI Chat Completions: POST /v1/chat/completions
+        - Ollama Generate: POST /api/generate
+        - Ollama Chat: POST /api/chat
+        """
         try:
+            url = (self.api_url or "").rstrip("/")
+
+            if url.endswith("/api/generate"):
+                response = await self.client.post(
+                    url,
+                    json={
+                        "model": self.model,
+                        "prompt": prompt,
+                        "format": "json",
+                        "stream": False,
+                        "options": {
+                            "temperature": temperature,
+                            "num_predict": max_tokens,
+                        },
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                return (data.get("response") or "").strip()
+
+            if url.endswith("/api/chat"):
+                response = await self.client.post(
+                    url,
+                    json={
+                        "model": self.model,
+                        "format": "json",
+                        "stream": False,
+                        "messages": [
+                            {"role": "user", "content": prompt},
+                        ],
+                        "options": {
+                            "temperature": temperature,
+                            "num_predict": max_tokens,
+                        },
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                message = data.get("message") or {}
+                return (message.get("content") or "").strip()
+
+            if url.endswith("/v1/chat/completions"):
+                response = await self.client.post(
+                    url,
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "user", "content": prompt},
+                        ],
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                        "stop": ["```", "---"],
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data["choices"][0]["message"]["content"].strip()
+
             response = await self.client.post(
-                self.api_url,
+                url,
                 json={
                     "model": self.model,
                     "prompt": prompt,
                     "max_tokens": max_tokens,
                     "temperature": temperature,
-                    "stop": ["```", "---"]
-                }
+                    "stop": ["```", "---"],
+                },
             )
             response.raise_for_status()
             data = response.json()
@@ -438,20 +505,37 @@ class MigrationPipeline:
         """Create Feith database engine (Oracle)"""
         # For Oracle: oracle+cx_oracle://user:pass@host:port/service
         # For PostgreSQL: postgresql://user:pass@host:port/db
-        
+
+        if Config.FEITH_FORCE_SQLITE:
+            logger.warning("FEITH_FORCE_SQLITE enabled; using SQLite mock for demonstration")
+            return create_engine("sqlite:///feith_mock.db")
+
+        def _try_engine(url: str):
+            engine = create_engine(url, poolclass=NullPool)
+            with engine.connect() as conn:
+                probe = "SELECT 1 FROM DUAL" if engine.dialect.name == "oracle" else "SELECT 1"
+                conn.execute(text(probe))
+            return engine
+
+        if Config.FEITH_DB_URL:
+            try:
+                return _try_engine(Config.FEITH_DB_URL)
+            except Exception as e:
+                logger.warning(f"FEITH_DB_URL connection error: {e}")
+
         # This is a placeholder - adjust based on actual Feith DB type
         feith_url_cx = f"oracle+cx_oracle://{Config.FEITH_DB_USER}:{Config.FEITH_DB_PASSWORD}@{Config.FEITH_DB_HOST}:{Config.FEITH_DB_PORT}/{Config.FEITH_DB_NAME}"
         feith_url_oracledb = f"oracle+oracledb://{Config.FEITH_DB_USER}:{Config.FEITH_DB_PASSWORD}@{Config.FEITH_DB_HOST}:{Config.FEITH_DB_PORT}/?service_name={Config.FEITH_DB_NAME}"
 
         try:
-            return create_engine(feith_url_cx, poolclass=NullPool)
+            return _try_engine(feith_url_cx)
         except NoSuchModuleError as e:
             logger.warning(f"Oracle cx_Oracle driver not available: {e}")
         except Exception as e:
             logger.warning(f"Oracle cx_Oracle connection error: {e}")
 
         try:
-            return create_engine(feith_url_oracledb, poolclass=NullPool)
+            return _try_engine(feith_url_oracledb)
         except NoSuchModuleError as e:
             logger.warning(f"Oracle oracledb driver not available: {e}")
         except Exception as e:

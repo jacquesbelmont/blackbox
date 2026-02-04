@@ -1,0 +1,14 @@
+2026-02-01 12:51:25,280 - feith_migrator - WARNING - Oracle cx_Oracle connection error: No module named 'cx_Oracle'
+2026-02-01 12:52:39,608 - feith_migrator - WARNING - Oracle cx_Oracle connection error: No module named 'cx_Oracle'
+2026-02-01 12:53:02,051 - feith_migrator - WARNING - Oracle cx_Oracle connection error: No module named 'cx_Oracle'
+2026-02-01 13:57:56,881 - feith_migrator - WARNING - Oracle cx_Oracle connection error: No module named 'cx_Oracle'
+2026-02-01 18:18:06,466 - feith_migrator - WARNING - FEITH_FORCE_SQLITE enabled; using SQLite mock for demonstration
+2026-02-01 18:18:13,743 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-02-01 18:18:13,746 - feith_migrator - INFO - Transformed DOC-00001: Invoice (confidence: 0.92)
+2026-02-01 18:19:40,154 - feith_migrator - WARNING - FEITH_FORCE_SQLITE enabled; using SQLite mock for demonstration
+2026-02-01 18:19:40,174 - feith_migrator - INFO - Processing batch of 3 records...
+2026-02-01 18:19:40,174 - feith_migrator - INFO - Transforming batch of 3 records...
+2026-02-01 18:19:46,753 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-02-01 18:19:53,402 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-02-01 18:20:00,834 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-02-01 18:20:00,837 - feith_migrator - INFO - Batch transformation complete: 3 records
